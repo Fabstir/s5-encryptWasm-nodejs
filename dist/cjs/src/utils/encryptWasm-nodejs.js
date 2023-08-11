@@ -6,7 +6,7 @@ const process = require("process");
 const { Buffer } = require("buffer");
 const { Blake3Hasher } = require("@napi-rs/blake-hash");
 const { Transform, Readable } = require("readable-stream");
-const { encrypt_file_xchacha20, } = require("../../encrypt_file/pkg/nodejs/encrypt_file");
+const { encrypt_file_xchacha20 } = require("../../encrypt_file/pkg/nodejs/encrypt_file");
 const cidTypeEncrypted = 0xae;
 const mhashBlake3Default = 0x1f;
 const encryptionAlgorithmXChaCha20Poly1305 = 0xa6;
@@ -44,8 +44,8 @@ function getEncryptedStreamReader(filePath, encryptedKey) {
     const chunkSize = 262144; // 256 KB;
     const fileStream = fs.createReadStream(filePath, { highWaterMark: chunkSize });
     const transformerEncrypt = getTransformerEncrypt(encryptedKey);
-    const encryptedFileStream = fileStream.pipe(transformerEncrypt)
-        .on('finish', function () {
+    const encryptedFileStream = fileStream.pipe(transformerEncrypt).on("finish", function () {
+        // finished
         // console.log('done encrypting');
     });
     return encryptedFileStream;
@@ -57,7 +57,11 @@ function getEncryptedStreamReader(filePath, encryptedKey) {
  */
 async function calculateB3hashFromFile(path) {
     // Create a readable stream from the file
-    const stream = new Readable({ read() { } });
+    const stream = new Readable({
+        read() {
+            /**/
+        },
+    });
     stream.push(path);
     stream.push(null);
     // Create an instance of Blake3Hasher
@@ -90,7 +94,7 @@ async function calculateB3hashFromFileEncrypt(filePath, encryptedKey) {
         // Convert chunk's ArrayBuffer to a Uint8Array and log it
         const chunkUint8Array = new Uint8Array(chunk);
         const encryptedChunkUint8Array = await encrypt_file_xchacha20(chunkUint8Array, encryptedKey, 0x0, chunkIndex);
-        console.log('B3hash Encrypted:  ', chunkIndex);
+        console.log("B3hash Encrypted:  ", chunkIndex);
         process.stdout.moveCursor(0, -1);
         // Update the hash with the encrypted chunk's data
         hasher.update(encryptedChunkUint8Array);
@@ -102,13 +106,56 @@ async function calculateB3hashFromFileEncrypt(filePath, encryptedKey) {
     // Return the hash value as a Promise resolved to a Buffer
     return { b3hash: Buffer.from(b3hash), encryptedFileSize };
 }
+const CID_TYPE_ENCRYPTED_LENGTH = 1;
+const ENCRYPTION_ALGORITHM_LENGTH = 1;
+const CHUNK_LENGTH_AS_POWEROF2_LENGTH = 1;
+const ENCRYPTED_BLOB_HASH_LENGTH = 33;
+const KEY_LENGTH = 32;
+/**
+ * Extracts the encryption key from an encrypted CID.
+ * @param {string} encryptedCid - The encrypted CID to get the key from.
+ * @returns {string} The encryption key from the CID.
+ */
+function getKeyFromEncryptedCid(encryptedCid) {
+    const extensionIndex = encryptedCid.lastIndexOf(".");
+    let cidWithoutExtension;
+    if (extensionIndex !== -1) {
+        cidWithoutExtension = encryptedCid.slice(0, extensionIndex);
+    }
+    else {
+        cidWithoutExtension = encryptedCid;
+    }
+    cidWithoutExtension = cidWithoutExtension.slice(1);
+    const cidBytes = convertBase64urlToBytes(cidWithoutExtension);
+    const startIndex = CID_TYPE_ENCRYPTED_LENGTH +
+        ENCRYPTION_ALGORITHM_LENGTH +
+        CHUNK_LENGTH_AS_POWEROF2_LENGTH +
+        ENCRYPTED_BLOB_HASH_LENGTH;
+    const endIndex = startIndex + KEY_LENGTH;
+    const selectedBytes = cidBytes.slice(startIndex, endIndex);
+    const key = convertBytesToBase64url(selectedBytes);
+    return key;
+}
 /**
  * Removes the encryption key from an encrypted CID.
  * @param {string} encryptedCid - The encrypted CID to remove the key from.
  * @returns {string} The CID with the encryption key removed.
  */
 function removeKeyFromEncryptedCid(encryptedCid) {
-    return encryptedCid.slice(0, -96) + encryptedCid.slice(-53);
+    const extensionIndex = encryptedCid.lastIndexOf(".");
+    const cidWithoutExtension = extensionIndex === -1 ? encryptedCid : encryptedCid.slice(0, extensionIndex);
+    // remove 'u' prefix as well
+    const cidWithoutExtensionBytes = convertBase64urlToBytes(cidWithoutExtension.slice(1));
+    const part1 = cidWithoutExtensionBytes.slice(0, CID_TYPE_ENCRYPTED_LENGTH +
+        ENCRYPTION_ALGORITHM_LENGTH +
+        CHUNK_LENGTH_AS_POWEROF2_LENGTH +
+        ENCRYPTED_BLOB_HASH_LENGTH);
+    const part2 = cidWithoutExtensionBytes.slice(part1.length + KEY_LENGTH);
+    const combinedBytes = new Uint8Array(cidWithoutExtensionBytes.length - KEY_LENGTH);
+    combinedBytes.set(part1);
+    combinedBytes.set(part2, part1.length);
+    const cidWithoutKey = "u" + convertBytesToBase64url(combinedBytes);
+    return cidWithoutKey;
 }
 /**
  * Combines an encryption key with an encrypted CID.
@@ -117,7 +164,21 @@ function removeKeyFromEncryptedCid(encryptedCid) {
  * @returns {string} The encrypted CID with the encryption key combined.
  */
 function combineKeytoEncryptedCid(key, encryptedCidWithoutKey) {
-    return encryptedCidWithoutKey.slice(0, -54) + key + encryptedCidWithoutKey.slice(-53);
+    const extensionIndex = encryptedCidWithoutKey.lastIndexOf(".");
+    const cidWithoutKeyAndExtension = extensionIndex === -1 ? encryptedCidWithoutKey : encryptedCidWithoutKey.slice(0, extensionIndex);
+    const encryptedCidWithoutKeyBytes = convertBase64urlToBytes(cidWithoutKeyAndExtension.slice(1));
+    const keyBytes = convertBase64urlToBytes(key);
+    const combinedBytes = new Uint8Array(encryptedCidWithoutKeyBytes.length + keyBytes.length);
+    const part1 = encryptedCidWithoutKeyBytes.slice(0, CID_TYPE_ENCRYPTED_LENGTH +
+        ENCRYPTION_ALGORITHM_LENGTH +
+        CHUNK_LENGTH_AS_POWEROF2_LENGTH +
+        ENCRYPTED_BLOB_HASH_LENGTH);
+    const part2 = encryptedCidWithoutKeyBytes.slice(part1.length);
+    combinedBytes.set(part1);
+    combinedBytes.set(keyBytes, part1.length);
+    combinedBytes.set(part2, part1.length + keyBytes.length);
+    const encryptedCid = `u` + convertBytesToBase64url(combinedBytes);
+    return encryptedCid;
 }
 /**
  * Creates an encrypted Content Identifier (CID) from the provided parameters.
@@ -174,7 +235,7 @@ async function encryptFile(file, filename, encryptedKey, cid) {
         };
     }
     catch (error) {
-        console.error('Encryption error:', error);
+        console.error("Encryption error:", error);
         throw error;
     }
 }
@@ -215,7 +276,7 @@ function getTransformerEncrypt(key) {
                 chunkIndex++;
             }
             callback();
-        }
+        },
     });
 }
 module.exports = {
@@ -223,6 +284,7 @@ module.exports = {
     getEncryptedStreamReader,
     calculateB3hashFromFile,
     calculateB3hashFromFileEncrypt,
+    getKeyFromEncryptedCid,
     removeKeyFromEncryptedCid,
     combineKeytoEncryptedCid,
     createEncryptedCid,

@@ -3,7 +3,7 @@
 /* istanbul ignore file */
 // Main import.
 const { encrypt_file_xchacha20, generate_key } = require("../../encrypt_file/pkg/nodejs/encrypt_file");
-const { readFile, getEncryptedStreamReader, calculateB3hashFromFile, calculateB3hashFromFileEncrypt, removeKeyFromEncryptedCid, combineKeytoEncryptedCid, createEncryptedCid, encryptFile, getTransformerEncrypt, } = require("./encryptWasm-nodejs");
+const { readFile, getEncryptedStreamReader, calculateB3hashFromFile, calculateB3hashFromFileEncrypt, getKeyFromEncryptedCid, removeKeyFromEncryptedCid, combineKeytoEncryptedCid, createEncryptedCid, encryptFile, getTransformerEncrypt, } = require("./encryptWasm-nodejs");
 // Main exports.
 module.exports = {
     generate_key,
@@ -12,6 +12,7 @@ module.exports = {
     getEncryptedStreamReader,
     calculateB3hashFromFile,
     calculateB3hashFromFileEncrypt,
+    getKeyFromEncryptedCid,
     removeKeyFromEncryptedCid,
     combineKeytoEncryptedCid,
     createEncryptedCid,
