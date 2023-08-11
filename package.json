@@ -1,0 +1,91 @@
+{
+  "name": "s5-encryptWasm-nodejs",
+  "version": "0.1.0-beta1",
+  "description": "S5 encyptWsam-nodejs for S5 NodeJS Client",
+  "main": "dist/cjs/src/index.js",
+  "types": "dist/cjs/src/index.d.ts",
+  "module": "dist/cjs/src/index.js",
+  "exports": {
+    ".": {
+      "require": "./dist/cjs/src/index.js"
+    }
+  },
+  "files": [
+    "dist/*"
+  ],
+  "browserslist": [
+    "defaults",
+    "not IE 11",
+    "not OperaMini all"
+  ],
+  "scripts": {
+    "build": "rimraf dist && tsc --project tsconfig.build.cjs.json && yarn copy-files",
+    "copy-files": "copyfiles -u 1 encrypt_file/pkg/nodejs/* dist/cjs/encrypt_file/",
+    "lint": "yarn lint:tsc && yarn lint:eslint",
+    "lint:eslint": "eslint . --max-warnings 0",
+    "lint:tsc": "tsc",
+    "prettier": "prettier --write src/*.ts",
+    "prepublishOnly": "yarn && yarn build",
+    "test": "echo hello",
+    "args": "echo second $1 first $0 all $@",
+    "webpack": "npx webpack --config ./webpack.config.js ",
+    "webpack-slim": "npx webpack --config ./webpack.slim.config.js",
+    "wasm-pack": "cd encrypt_file && wasm-pack build --target nodejs -d pkg/nodejs && rimraf target"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --max-warnings 0",
+      "prettier --write"
+    ],
+    "*.{json,yml,md}": [
+      "prettier --write"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fabstir/s5-encryptWasm-nodejs.git"
+  },
+  "keywords": [
+    "Decentralised",
+    "Content-Addressed",
+    "Cloud Storage",
+    "S5"
+  ],
+  "author": "Fabstir",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Fabstir/s5-encryptWasm-nodejs/issues"
+  },
+  "homepage": "https://github.com/Fabstir/s5-encryptWasm-nodejs",
+  "dependencies": {
+    "@napi-rs/blake-hash": "^1.3.2",
+    "@noble/hashes": "^1.3.1",
+    "axios": "^1.4.0",
+    "path-browserify": "1.0.1",
+    "readable-stream": "^4.4.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.5",
+    "@babel/plugin-proposal-class-properties": "^7.18.6",
+    "@babel/plugin-transform-runtime": "^7.22.5",
+    "@babel/preset-env": "^7.22.5",
+    "@babel/preset-typescript": "^7.22.5",
+    "@types/node": "^20.2.5",
+    "@typescript-eslint/eslint-plugin": "^5.59.9",
+    "@typescript-eslint/parser": "^5.59.9",
+    "babel-loader": "^9.1.2",
+    "copyfiles": "^2.4.1",
+    "crypto-browserify": "3.12.0",
+    "eslint": "^8.43.0",
+    "eslint-plugin-jsdoc": "46.2.6",
+    "lint-staged": "^13.2.2",
+    "prettier": "^2.8.8",
+    "rimraf": "^5.0.1",
+    "stream-browserify": "3.0.0",
+    "typescript": "5.0.4",
+    "wasm-pack": "^0.12.1",
+    "webpack": "^5.86.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-merge": "^5.9.0"
+  }
+}
