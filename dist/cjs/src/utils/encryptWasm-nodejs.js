@@ -44,8 +44,8 @@ function getEncryptedStreamReader(filePath, encryptedKey) {
     const chunkSize = 262144; // 256 KB;
     const fileStream = fs.createReadStream(filePath, { highWaterMark: chunkSize });
     const transformerEncrypt = getTransformerEncrypt(encryptedKey);
-    const encryptedFileStream = fileStream.pipe(transformerEncrypt).on("finish", function () {
-        // finished
+    const encryptedFileStream = fileStream.pipe(transformerEncrypt)
+        .on('finish', function () {
         // console.log('done encrypting');
     });
     return encryptedFileStream;
@@ -57,11 +57,7 @@ function getEncryptedStreamReader(filePath, encryptedKey) {
  */
 async function calculateB3hashFromFile(path) {
     // Create a readable stream from the file
-    const stream = new Readable({
-        read() {
-            /**/
-        },
-    });
+    const stream = new Readable({ read() { } });
     stream.push(path);
     stream.push(null);
     // Create an instance of Blake3Hasher
@@ -90,10 +86,8 @@ async function calculateB3hashFromFileEncrypt(filePath, encryptedKey) {
     let chunkIndex = 0;
     // Process the file in chunks
     const fileStream = await fs.createReadStream(filePath, { highWaterMark: chunkSize });
-    for await (const chunk of fileStream) {
-        // Convert chunk's ArrayBuffer to a Uint8Array and log it
-        const chunkUint8Array = new Uint8Array(chunk);
-        const encryptedChunkUint8Array = await encrypt_file_xchacha20(chunkUint8Array, encryptedKey, 0x0, chunkIndex);
+    for await (const chunk of readChunks(fileStream, chunkSize)) {
+        const encryptedChunkUint8Array = await encrypt_file_xchacha20(chunk, encryptedKey, 0x0, chunkIndex);
         console.log("B3hash Encrypted:  ", chunkIndex);
         process.stdout.moveCursor(0, -1);
         // Update the hash with the encrypted chunk's data
@@ -105,6 +99,64 @@ async function calculateB3hashFromFileEncrypt(filePath, encryptedKey) {
     const b3hash = hasher.digestBuffer();
     // Return the hash value as a Promise resolved to a Buffer
     return { b3hash: Buffer.from(b3hash), encryptedFileSize };
+}
+/**
+ * Asynchronous generator function that reads data from an input stream in chunks of a specified size.
+ * @param {Readable} inputStream - The input stream to read data from.
+ * @param {number} chunkSize - The desired size of each chunk.
+ * @yields {Buffer} A chunk of data from the input stream.
+ */
+async function* readChunks(inputStream, chunkSize) {
+    // Initialize an empty buffer to accumulate incoming chunks of data.
+    let buffer = Buffer.alloc(0);
+    // Asynchronously iterate over each chunk of data received from the inputStream.
+    for await (const chunk of inputStream) {
+        // Append the newly received chunk to the existing buffer.
+        buffer = Buffer.concat([buffer, chunk]);
+        // Check if the accumulated buffer contains enough data to produce at least one complete chunk of the specified chunkSize.
+        while (buffer.length >= chunkSize) {
+            // Yield a chunk of data with a length of chunkSize from the beginning of the buffer.
+            yield buffer.slice(0, chunkSize);
+            // Remove the yielded chunk from the beginning of the buffer.
+            buffer = buffer.slice(chunkSize);
+        }
+    }
+    // If there's remaining data in the buffer that is smaller than chunkSize, yield it as a chunk.
+    if (buffer.length > 0) {
+        yield buffer;
+    }
+}
+/**
+ * Converts an array of bytes to a URL-safe Base64 representation.
+ * @param {Uint8Array} hashBytes - The array of bytes to be converted.
+ * @returns {string} The URL-safe Base64 representation of the input bytes.
+ */
+function convertBytesToBase64url(hashBytes) {
+    // Convert the array of bytes to a Buffer
+    const mHash = Buffer.from(hashBytes);
+    // Convert the Buffer to a Base64 string
+    const hashBase64 = mHash.toString("base64");
+    // Make the Base64 string URL-safe
+    const hashBase64url = hashBase64.replace(/\+/g, "-").replace(/\//g, "_").replace("=", "");
+    return hashBase64url;
+}
+/**
+ * Converts a URL-safe Base64 encoded string to a Uint8Array of bytes.
+ * @param {string} b64url - The URL-safe Base64 encoded string to be converted.
+ * @returns {Uint8Array} - A Uint8Array containing the decoded bytes.
+ */
+function convertBase64urlToBytes(b64url) {
+    // Convert the URL-safe Base64 string to a regular Base64 string
+    let b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+    // Add missing padding
+    while (b64.length % 4) {
+        b64 += "=";
+    }
+    // Convert Base64 string to Buffer
+    const buffer = Buffer.from(b64, "base64");
+    // Convert Buffer to Uint8Array
+    const bytes = new Uint8Array(buffer);
+    return bytes;
 }
 const CID_TYPE_ENCRYPTED_LENGTH = 1;
 const ENCRYPTION_ALGORITHM_LENGTH = 1;
