@@ -1,6 +1,6 @@
 {
   "name": "s5-encryptWasm-nodejs",
-  "version": "0.1.0-beta1",
+  "version": "0.1.0-beta1-dev-1",
   "description": "S5 encyptWsam-nodejs for S5 NodeJS Client",
   "main": "dist/cjs/src/index.js",
   "types": "dist/cjs/src/index.d.ts",
